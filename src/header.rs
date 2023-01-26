@@ -1,7 +1,8 @@
-use std::{collections::HashMap};
+use crate::normalize::normalize_header_key;
+use std::collections::HashMap;
 
-#[derive(Debug)]
-struct MIMEHeader(HashMap<String, Vec<String>>);
+#[derive(Debug, Clone, Default)]
+pub struct MIMEHeader(HashMap<String, Vec<String>>);
 
 impl MIMEHeader {
     pub fn new() -> MIMEHeader {
@@ -9,7 +10,7 @@ impl MIMEHeader {
     }
 
     pub fn new_from(key: String, values: Vec<String>) -> MIMEHeader {
-        let mut header =  Self::new();
+        let mut header = Self::new();
         for value in values.into_iter() {
             header.add(&key, value);
         }
@@ -58,105 +59,4 @@ impl MIMEHeader {
             None => String::from_utf8(key).unwrap(),
         }
     }
-}
-
-fn normalize_header_key(key: &mut [u8]) -> Option<String> {
-    let mut no_canon = false;
-    for c in key.iter() {
-        if is_valid_header_byte(c) {
-            continue;
-        }
-        if *c == b' ' {
-            no_canon = true;
-            continue;
-        }
-        return None;
-    }
-    if no_canon {
-        return Some(String::from_utf8(key.into()).unwrap());
-    }
-    let mut upper = true;
-
-    for c in key.iter_mut() {
-        if upper && c.is_ascii_lowercase() {
-            *c = c.to_ascii_uppercase();
-        } else if !upper && c.is_ascii_uppercase() {
-            *c = c.to_ascii_lowercase();
-        }
-        // We only capitalize the first letter of the
-        // header and subsequent letters that follow a hyphen(-)
-        upper = *c == b'-'
-    }
-    let common_headers = common_headers();
-    let header = String::from_utf8(key.into()).unwrap();
-    if let Some(x) = common_headers.get(&header) {
-        return Some(x.clone());
-    }
-    Some(header)
-}
-
-fn is_valid_header_byte(c: &u8) -> bool {
-    let symbols: Vec<char> = vec![
-        '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~',
-    ];
-    let mut range = vec!['0'..='9', 'a'..='z', 'A'..='Z'];
-
-    let range = range
-        .iter_mut()
-        .flatten()
-        .collect::<Vec<char>>()
-        .into_iter()
-        .chain(symbols.into_iter())
-        .any(|x| x == (*c as char));
-
-    range
-}
-
-fn common_headers() -> HashMap<String, String> {
-    let common_headers = vec![
-        "Accept",
-        "Accept-Charset",
-        "Accept-Encoding",
-        "Accept-Language",
-        "Accept-Ranges",
-        "Cache-Control",
-        "Cc",
-        "Connection",
-        "Content-Id",
-        "Content-Language",
-        "Content-Length",
-        "Content-Transfer-Encoding",
-        "Content-Type",
-        "Cookie",
-        "Date",
-        "Dkim-Signature",
-        "Etag",
-        "Expires",
-        "From",
-        "Host",
-        "If-Modified-Since",
-        "If-None-Match",
-        "In-Reply-To",
-        "Last-Modified",
-        "Location",
-        "Message-Id",
-        "Mime-Version",
-        "Pragma",
-        "Received",
-        "Return-Path",
-        "Server",
-        "Set-Cookie",
-        "Subject",
-        "To",
-        "User-Agent",
-        "Via",
-        "X-Forwarded-For",
-        "X-Imforwards",
-        "X-Powered-By",
-    ];
-
-    common_headers
-        .into_iter()
-        .map(|x| (x.to_string(), x.to_string()))
-        .collect()
 }
